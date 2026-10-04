@@ -1101,8 +1101,8 @@ button:disabled { cursor:not-allowed; opacity:.45; transform:none; }
   run supabase-setup.sql, then paste the Project URL + anon/publishable key here.
 */
 window.CAMPBACH_CONFIG = {
-  supabaseUrl: "",
-  supabaseAnonKey: ""
+  supabaseUrl: "https://jxggsmjdkugjmzanqsvo.supabase.co",
+  supabaseAnonKey: "sb_publishable_rYNcua5PBCDo039kcuhmqw_BWv4tO6s"
 };
 
 </script>
@@ -1412,30 +1412,22 @@ window.CAMPBACH_CONFIG = {
 
   const supaBackend = {
     mode: "supabase",
-    async createRoom(name) {
-      let code = randomCode();
-      let created;
-      for (let tries = 0; tries < 8; tries++) {
-        const result = await sb.from("rooms").insert({ code, status: "lobby", game_state: { phase: "lobby" } }).select().single();
-        if (!result.error) { created = result.data; break; }
-        if (result.error.code === "23505") code = randomCode(); else throw result.error;
+    async ensureSession() {
+      const { data, error } = await sb.auth.getSession();
+      if (error) throw error;
+      if (!data.session) {
+        const result = await sb.auth.signInAnonymously();
+        if (result.error) throw new Error("Falta activar Anonymous Sign-Ins en Supabase o no se pudo conectar. Intenta de nuevo.");
       }
-      if (!created) throw new Error("No pude crear el room. Intenta de nuevo.");
-      const p = await sb.from("players").insert({ room_id: created.id, name }).select().single();
-      if (p.error) throw p.error;
-      const r = await sb.from("rooms").update({ host_player_id: p.data.id }).eq("id", created.id).select().single();
-      if (r.error) throw r.error;
-      return { room: r.data, player: p.data };
     },
-    async joinRoom(code, name) {
-      const r = await sb.from("rooms").select("*").eq("code", String(code)).maybeSingle();
-      if (r.error) throw r.error;
-      if (!r.data) throw new Error("No existe ese código.");
-      if (r.data.status !== "lobby") throw new Error("La partida ya empezó.");
-      const p = await sb.from("players").insert({ room_id: r.data.id, name }).select().single();
-      if (p.error) throw p.error;
-      return { room: r.data, player: p.data };
+    async enter(name, code = null) {
+      await this.ensureSession();
+      const { data, error } = await sb.rpc("camp_enter_room", { player_name: name, room_code: code });
+      if (error) throw new Error(error.code === "PGRST202" ? "Falta ejecutar el archivo de configuración en Supabase." : error.message);
+      return data;
     },
+    async createRoom(name) { return this.enter(name); },
+    async joinRoom(code, name) { return this.enter(name, String(code)); },
     async getSnapshot(code) {
       const r = await sb.from("rooms").select("*").eq("code", String(code)).single();
       if (r.error) throw r.error;
@@ -1475,8 +1467,9 @@ window.CAMPBACH_CONFIG = {
           .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `room_id=eq.${roomId}` }, refresh)
           .on("postgres_changes", { event: "*", schema: "public", table: "votes", filter: `room_id=eq.${roomId}` }, refresh)
           .subscribe();
-      })();
-      return () => { stopped = true; clearTimeout(timeout); if (channel) sb.removeChannel(channel); };
+      })().catch(err => console.error("Realtime:", err));
+      const poll = setInterval(() => !stopped && fn(), 2500);
+      return () => { stopped = true; clearInterval(poll); clearTimeout(timeout); if (channel) sb.removeChannel(channel); };
     }
   };
 

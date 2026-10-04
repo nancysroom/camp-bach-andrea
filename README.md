@@ -9,9 +9,9 @@ Incluye paisaje ilustrado, parallax, parches bordados interactivos, contador, it
 
 ## Juegos
 
-Yo nunca nunca funciona desde una pantalla. La trivia está en modo de prueba local: los códigos funcionan entre pestañas del mismo navegador, no entre celulares.
+Yo nunca nunca funciona desde una pantalla. La trivia ya tiene configurada la conexión pública a Supabase. Para activarla, habilita **Anonymous Sign-Ins** en Authentication y ejecuta `activar-juego-camp-bach.sql` en el SQL Editor del proyecto Camp Bach. Las invitadas entran sin correo ni contraseña; el código permite unirse a una sala y sus datos solo son visibles a sus integrantes.
 
-Para conectar distintos celulares, descomprime el código fuente y sigue las instrucciones de Supabase en su README. Modificar el `config.js` del ZIP no cambia esta página independiente; hay que publicar la versión modular configurada o regenerar el HTML integrado.
+La anfitriona crea una sala; las demás entran con su código desde otro celular. Cada una completa su perfil y la anfitriona inicia la partida cuando haya al menos dos listas.
 
 ## Publicación
 
